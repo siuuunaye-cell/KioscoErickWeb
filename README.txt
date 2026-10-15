@@ -13,3 +13,10 @@ La cámara necesita HTTPS y permiso. El escaneo automático usa BarcodeDetector,
 Pitido al escanear: suena un beep (y vibra) cada vez que se lee un producto registrado; un tono grave si el código no existe o no hay stock. La cámara queda abierta para pasar varios productos seguidos; se cierra con el botón Cerrar cámara.
 
 Carga de productos con cámara: en la pestaña Productos, 'Escanear código de barras' completa el código solo (si ya existe, carga sus datos para editar). 'Guardar y escanear otro' guarda y abre la cámara para el siguiente.
+
+Caja y ganancia: en Venta se elige el medio de pago (efectivo, transferencia, Mercado Pago, tarjeta) y en efectivo se escribe con cuánto paga el cliente para ver el vuelto. En Productos se puede cargar el costo. La pestaña Caja muestra el total del día por medio de pago, la ganancia estimada (solo productos con costo) y el cierre de caja con diferencia. La copia de seguridad incluye los datos de caja.
+
+Stock bajo: cada producto puede tener stock mínimo; si no, se usa el general (se cambia en Productos > Stock bajo). La pestaña Productos muestra un aviso con la cantidad y se puede compartir la lista de reposición por WhatsApp.
+Aumento masivo: en Productos > Actualizar precios se sube o baja un % a todos (o a los de la búsqueda), con redondeo y opción de subir también el costo. Tiene botón para deshacer el último aumento.
+
+Cuentas: la app pide usuario y contraseña (Supabase). Cada kiosco tiene sus datos en la nube y se sincronizan solos. Si el plan vence o la cuenta se suspende, se bloquea el acceso. La clave de Supabase va en config.js.
