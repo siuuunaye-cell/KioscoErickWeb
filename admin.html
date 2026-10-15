@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="theme-color" content="#101827"><title>Panel · Kiosco Erick</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#f3f5f9;color:#101827}
+header{background:#101827;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
+header small{opacity:.7;display:block;font-size:11px;letter-spacing:.08em}header h1{margin:0;font-size:20px}
+main{max-width:640px;margin:0 auto;padding:14px}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 1px 4px #0001}
+h2{margin:0 0 10px;font-size:17px}label{display:block;font-size:13px;margin:8px 0 2px;color:#475569}
+input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px;background:#fff}
+button{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:14px;cursor:pointer}
+button.primary{background:#101827;color:#fff;border-color:#101827}button.wide{width:100%;margin-top:12px;padding:13px;font-size:16px}
+.msg{margin:10px 0 0;font-size:14px;min-height:18px}.err{color:#b91c1c}.okm{color:#15803d}
+.u{border-top:1px solid #e2e8f0;padding:10px 0}.u:first-child{border-top:0}
+.u b{font-size:16px}.u small{display:block;color:#64748b;margin-top:2px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
+.t-ok{background:#dcfce7;color:#166534}.t-warn{background:#fef9c3;color:#854d0e}.t-bad{background:#fee2e2;color:#991b1b}.t-adm{background:#e0e7ff;color:#3730a3}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.cred{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-top:10px;font-size:15px;white-space:pre-line}
+[hidden]{display:none!important}
+</style></head><body>
+
+<div id="login" hidden><main><div class="card"><h2>🔐 Panel de administración</h2>
+<label>Usuario administrador<input id="lgUser" autocapitalize="none" autocomplete="username"></label>
+<label>Contraseña<input id="lgPass" type="password" autocomplete="current-password"></label>
+<button id="lgBtn" class="primary wide">Entrar</button><p id="lgMsg" class="msg err"></p></div></main></div>
+
+<div id="panel" hidden>
+<header><div><small>ADMINISTRACIÓN</small><h1>⚡ Kiosco Erick</h1></div><button id="salir">Salir</button></header>
+<main>
+<div class="card"><h2>➕ Crear usuario</h2>
+<label>Usuario (sin espacios)<input id="nUser" autocapitalize="none" placeholder="kiosco.lopez"></label>
+<label>Nombre del kiosco o cliente<input id="nNombre" placeholder="Kiosco López"></label>
+<label>Contraseña (mínimo 6)<input id="nPass" type="text" autocomplete="off"></label>
+<label>Plan<select id="nPlan"><option value="7">Prueba 7 días</option><option value="30" selected>1 mes (30 días)</option><option value="90">3 meses (90 días)</option><option value="180">6 meses (180 días)</option><option value="365">1 año (365 días)</option><option value="perm">Permanente</option></select></label>
+<button id="crear" class="primary wide">Crear usuario</button><p id="cMsg" class="msg"></p><div id="cred" class="cred" hidden></div><button id="copiar" hidden>📋 Copiar datos</button></div>
+<div class="card"><h2>👥 Usuarios (<span id="cant">0</span>)</h2><input id="buscar" placeholder="Buscar usuario o nombre"><div id="lista"></div><p id="lMsg" class="msg err"></p></div>
+</main></div>
+
+<script src="config.js"></script>
+<script>
+(()=>{const C=window.KE_CFG||{},D="@kioscoerick.app",$=i=>document.getElementById(i),SS=sessionStorage;
+let S=null,users=[];try{S=JSON.parse(SS.getItem("ke_admin")||"null")}catch{}
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
+const f2=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const hoy=()=>f2(new Date());
+const sumar=(f,n)=>{const d=new Date(f+"T00:00:00");d.setDate(d.getDate()+n);return f2(d)};
+const dias=f=>Math.round((new Date(f+"T00:00:00")-new Date(hoy()+"T00:00:00"))/864e5);
+const fmt=f=>f?f.split("-").reverse().join("/"):"—";
+const hdr=t=>({apikey:C.key,"Content-Type":"application/json",...(t?{Authorization:"Bearer "+t}:{})});
+async function j(r){let d=null;try{d=await r.json()}catch{}if(!r.ok)throw Object.assign(new Error(d?.msg||d?.error_description||d?.message||d?.error||"Error "+r.status),{status:r.status});return d}
+const keep=()=>S?SS.setItem("ke_admin",JSON.stringify(S)):SS.removeItem("ke_admin");
+const setTok=d=>{S={access:d.access_token,refresh:d.refresh_token,exp:Date.now()+(d.expires_in-60)*1000,uid:d.user.id};keep()};
+async function tok(){if(!S)throw Object.assign(new Error("Sin sesión"),{status:401});if(Date.now()<S.exp)return S.access;
+ setTok(await j(await fetch(C.url+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:hdr(),body:JSON.stringify({refresh_token:S.refresh})})));return S.access}
+async function api(p,o={}){const t=await tok();return j(await fetch(C.url+"/rest/v1/"+p,{...o,headers:{...hdr(t),...(o.headers||{})}}))}
+const show=m=>{$("login").hidden=m!=="login";$("panel").hidden=m!=="panel"};
+
+async function entrar(){
+ if(!S)return show("login");
+ try{const r=await api("perfiles?select=es_admin,activo&id=eq."+S.uid);
+  if(!r.length||!r[0].es_admin||!r[0].activo){S=null;keep();$("lgMsg").textContent="Esta cuenta no es administradora";return show("login")}
+  show("panel");cargar()}
+ catch(e){S=null;keep();$("lgMsg").textContent="Sesión vencida, entrá de nuevo";show("login")}}
+
+$("lgBtn").onclick=async()=>{const u=$("lgUser").value.trim().toLowerCase(),p=$("lgPass").value,m=$("lgMsg");
+ if(!u||!p)return m.textContent="Escribí usuario y contraseña";m.textContent="Entrando…";
+ try{setTok(await j(await fetch(C.url+"/auth/v1/token?grant_type=password",{method:"POST",headers:hdr(),body:JSON.stringify({email:u.includes("@")?u:u+D,password:p})})));$("lgPass").value="";m.textContent="";entrar()}
+ catch(e){m.textContent=e.status?"Usuario o contraseña incorrectos":"Sin conexión"}};
+$("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
+$("salir").onclick=()=>{S=null;keep();users=[];show("login")};
+
+async function cargar(){$("lMsg").textContent="";
+ try{users=await api("perfiles?select=id,usuario,nombre,vence,permanente,activo,es_admin&order=usuario.asc");pintar()}
+ catch(e){$("lMsg").textContent="No se pudo cargar: "+e.message}}
+
+function estado(p){
+ if(!p.activo)return['<span class="tag t-bad">Suspendido</span>',"Suspendido"];
+ if(p.permanente||p.es_admin)return['<span class="tag t-ok">Permanente</span>',"Plan permanente"];
+ const d=p.vence?dias(p.vence):-1;
+ if(d<0)return['<span class="tag t-bad">Vencido</span>',"Venció el "+fmt(p.vence)];
+ return[`<span class="tag ${d<=5?"t-warn":"t-ok"}">${d} días</span>`,"Vence el "+fmt(p.vence)]}
+
+function pintar(){const q=$("buscar").value.trim().toLowerCase();
+ const l=users.filter(p=>!q||(p.usuario||"").toLowerCase().includes(q)||(p.nombre||"").toLowerCase().includes(q));
+ $("cant").textContent=users.length;
+ $("lista").innerHTML=l.map(p=>{const[tag,txt]=estado(p);
+  return`<div class="u"><b>${esc(p.usuario)}</b>${tag}${p.es_admin?'<span class="tag t-adm">Admin</span>':""}<small>${esc(p.nombre||"")}</small><small>${txt}</small>
+  ${p.es_admin?"":`<div class="acts"><button data-a="mas" data-id="${p.id}">+30 días</button><button data-a="act" data-id="${p.id}">${p.activo?"Suspender":"Reactivar"}</button><button data-a="perm" data-id="${p.id}">${p.permanente?"Quitar permanente":"Hacer permanente"}</button></div>`}</div>`}).join("")||'<p class="msg">Sin resultados</p>'}
+$("buscar").oninput=pintar;
+
+async function patch(id,body){await api("perfiles?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(body)})}
+$("lista").onclick=async e=>{const b=e.target.closest("button[data-a]");if(!b)return;
+ const p=users.find(x=>x.id===b.dataset.id);if(!p)return;let body,ask;
+ if(b.dataset.a==="mas"){const base=p.vence&&p.vence>hoy()?p.vence:hoy();body={vence:sumar(base,30),activo:true};ask="¿Sumar 30 días a "+p.usuario+"? Nuevo vencimiento: "+fmt(body.vence)}
+ else if(b.dataset.a==="act"){body={activo:!p.activo};ask=(p.activo?"¿Suspender a ":"¿Reactivar a ")+p.usuario+"?"}
+ else{body=p.permanente?{permanente:false}:{permanente:true,activo:true,vence:p.vence||hoy()};ask=(p.permanente?"¿Quitar el plan permanente a ":"¿Hacer permanente a ")+p.usuario+"?"}
+ if(!confirm(ask))return;
+ try{await patch(p.id,body);await cargar()}catch(err){$("lMsg").textContent="No se pudo guardar: "+err.message}};
+
+$("crear").onclick=async()=>{const m=$("cMsg");m.className="msg";m.textContent="";$("cred").hidden=true;$("copiar").hidden=true;
+ const u=$("nUser").value.trim().toLowerCase(),nom=$("nNombre").value.trim(),pw=$("nPass").value,plan=$("nPlan").value;
+ if(!/^[a-z0-9._-]{3,30}$/.test(u)){m.className="msg err";return m.textContent="Usuario: 3 a 30 caracteres, solo letras, números, punto, guion"}
+ if(pw.length<6){m.className="msg err";return m.textContent="La contraseña debe tener al menos 6 caracteres"}
+ const perm=plan==="perm",vence=perm?hoy():sumar(hoy(),Number(plan));
+ $("crear").disabled=true;m.textContent="Creando…";
+ try{
+  let d;try{d=await j(await fetch(C.url+"/auth/v1/signup",{method:"POST",headers:hdr(),body:JSON.stringify({email:u+D,password:pw})}))}
+  catch(e){throw new Error(/registered|already|exist/i.test(e.message)?"Ese usuario ya existe. Si quedó sin perfil, borralo en Supabase > Authentication > Users y probá de nuevo.":e.message)}
+  const id=d?.user?.id||d?.id;if(!id)throw new Error("Supabase no devolvió el id del usuario");
+  await api("perfiles?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,usuario:u,nombre:nom||u,vence,permanente:perm,activo:true,es_admin:false})});
+  m.className="msg okm";m.textContent="✓ Usuario creado";
+  const txt=`Kiosco Erick\nUsuario: ${u}\nContraseña: ${pw}\n${perm?"Plan permanente":"Vence el "+fmt(vence)}`;
+  $("cred").textContent=txt;$("cred").hidden=false;$("copiar").hidden=false;
+  $("copiar").onclick=()=>navigator.clipboard.writeText(txt).then(()=>$("copiar").textContent="✓ Copiado");$("copiar").textContent="📋 Copiar datos";
+  ["nUser","nNombre","nPass"].forEach(i=>$(i).value="");cargar()}
+ catch(e){m.className="msg err";m.textContent=e.message}
+ $("crear").disabled=false};
+
+entrar();
+})();
+</script></body></html>
