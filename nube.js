@@ -42,7 +42,7 @@ async function sync(manual){if(busy||!S||!navigator.onLine||!h.get)return;busy=t
 function programar(){ver++;LS.setItem("ke_dirty","1");clearTimeout(tm);if(S)tm=setTimeout(sync,3000)}
 async function salir(){if(navigator.onLine&&LS.getItem("ke_dirty")==="1"&&S)try{await subir()}catch{}
  let sin=LS.getItem("ke_dirty")==="1";if(!confirm(sin?"⚠ Hay cambios que NO se subieron a la nube y se perderían. ¿Cerrar sesión igual?":"Al cerrar sesión se borran los datos de este celular (quedan guardados en la nube). ¿Continuar?"))return;
- ["ke_products","ke_sales","ke_cash","ke_cfg","ke_dirty","ke_sync_at","ke_sync_uid","ke_perfil","ke_undo","ke_session"].forEach(k=>LS.removeItem(k));location.reload()}
+ ["ke_products","ke_sales","ke_cash","ke_cfg","ke_fiado","ke_dirty","ke_sync_at","ke_sync_uid","ke_perfil","ke_undo","ke_session"].forEach(k=>LS.removeItem(k));location.reload()}
 window.Nube={programar,login,arrancar,sync,
  iniciar(x){h=x;$("bqSalir").onclick=salir;$("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
   $("lgBtn").onclick=async()=>{let u=$("lgUser").value,p=$("lgPass").value,m=$("lgMsg");if(!u||!p)return m.textContent="Escribí usuario y contraseña";m.textContent="Entrando…";try{await login(u,p);$("lgPass").value="";m.textContent="";arrancar()}catch(e){m.textContent=e.status?"Usuario o contraseña incorrectos":"Sin conexión. Probá de nuevo con internet."}};
