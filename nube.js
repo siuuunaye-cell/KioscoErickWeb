@@ -46,5 +46,17 @@ async function salir(){if(navigator.onLine&&LS.getItem("ke_dirty")==="1"&&S)try{
 window.Nube={programar,login,arrancar,sync,
  iniciar(x){h=x;$("bqSalir").onclick=salir;$("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
   $("lgBtn").onclick=async()=>{let u=$("lgUser").value,p=$("lgPass").value,m=$("lgMsg");if(!u||!p)return m.textContent="Escribí usuario y contraseña";m.textContent="Entrando…";try{await login(u,p);$("lgPass").value="";m.textContent="";arrancar()}catch(e){m.textContent=e.status?"Usuario o contraseña incorrectos":"Sin conexión. Probá de nuevo con internet."}};
-  addEventListener("online",()=>sync());arrancar()}};
+  addEventListener("online",()=>sync());
+  const cargarCuenta=()=>{
+   const titulo=$("bqT"),mensaje=$("bqM");
+   titulo.textContent="Verificando cuenta…";mensaje.textContent="Esperá un momento mientras comprobamos tu acceso.";
+   let retry=$("bqRetry");if(!retry){retry=document.createElement("button");retry.id="bqRetry";retry.className="wide";retry.textContent="Reintentar";retry.onclick=()=>cargarCuenta();$("bloqueo").querySelector(".gbox").appendChild(retry)}retry.hidden=true;
+   Promise.race([arrancar(),new Promise((_,reject)=>setTimeout(()=>reject(new Error("timeout")),12000))]).catch(()=>{
+    if($("bloqueo").hidden)return;
+    titulo.textContent="No pudimos verificar la cuenta";
+    mensaje.textContent=navigator.onLine?"La conexión con el servidor tardó demasiado. Probá otra vez.":"No hay conexión a internet. Conectate y reintentá.";
+    retry.hidden=false;
+   });
+  };
+  addEventListener("online",()=>{if(!$("bloqueo").hidden)cargarCuenta();else sync()});cargarCuenta()}};
 })();
