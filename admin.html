@@ -16,7 +16,7 @@ button.primary{background:#101827;color:#fff;border-color:#101827}button.wide{wi
 .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
 .t-ok{background:#dcfce7;color:#166534}.t-warn{background:#fef9c3;color:#854d0e}.t-bad{background:#fee2e2;color:#991b1b}.t-adm{background:#e0e7ff;color:#3730a3}
 .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.cred{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-top:10px;font-size:15px;white-space:pre-line}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px}.stat b{display:block;font-size:20px}.biz{border-top:1px solid #e2e8f0;padding:10px 0}.biz small{display:block;color:#64748b;margin-top:3px}.cred{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px;margin-top:10px;font-size:15px;white-space:pre-line}
 [hidden]{display:none!important}
 </style></head><body>
 
@@ -28,11 +28,15 @@ button.primary{background:#101827;color:#fff;border-color:#101827}button.wide{wi
 <div id="panel" hidden>
 <header><div><small>ADMINISTRACIÓN</small><h1>⚡ Kiosco Erick</h1></div><button id="salir">Salir</button></header>
 <main>
+<div class="card"><h2>📊 Resumen de negocios</h2><p class="msg">Datos de la última sincronización de cada kiosco.</p><div id="resumen" class="stats"></div><button id="recargarDatos" class="wide">🔄 Actualizar estadísticas</button><div id="negocios"></div><p id="dMsg" class="msg err"></p></div>
 <div class="card"><h2>➕ Crear usuario</h2>
 <label>Usuario (sin espacios)<input id="nUser" autocapitalize="none" placeholder="kiosco.lopez"></label>
 <label>Nombre del kiosco o cliente<input id="nNombre" placeholder="Kiosco López"></label>
 <label>Contraseña (mínimo 6)<input id="nPass" type="text" autocomplete="off"></label>
-<label>Plan<select id="nPlan"><option value="7">Prueba 7 días</option><option value="30" selected>1 mes (30 días)</option><option value="90">3 meses (90 días)</option><option value="180">6 meses (180 días)</option><option value="365">1 año (365 días)</option><option value="perm">Permanente</option></select></label>
+<label>Plan<select id="nPlan"><option value="7">Prueba 7 días</option><option value="30" selected>1 mes (30 días)</option><option value="90">3 meses (90 días)</option><option value="180">6 meses (180 días)</option><option value="365">1 año (365 días)</option><option value="fecha">Elegir fecha y hora…</option><option value="perm">Permanente</option></select></label>
+<label id="fechaLabel" hidden>Fecha de vencimiento<input id="nFecha" type="date"></label>
+<label id="horaLabel" hidden>Hora de vencimiento<input id="nHora" type="time" value="23:59"></label>
+<p id="fechaNota" class="msg" hidden>Se guardan la fecha y la hora exactas. Primero ejecutá el SQL de actualización incluido.</p>
 <button id="crear" class="primary wide">Crear usuario</button><p id="cMsg" class="msg"></p><div id="cred" class="cred" hidden></div><button id="copiar" hidden>📋 Copiar datos</button></div>
 <div class="card"><h2>👥 Usuarios (<span id="cant">0</span>)</h2><input id="buscar" placeholder="Buscar usuario o nombre"><div id="lista"></div><p id="lMsg" class="msg err"></p></div>
 </main></div>
@@ -56,6 +60,11 @@ async function tok(){if(!S)throw Object.assign(new Error("Sin sesión"),{status:
 async function api(p,o={}){const t=await tok();return j(await fetch(C.url+"/rest/v1/"+p,{...o,headers:{...hdr(t),...(o.headers||{})}}))}
 const show=m=>{$("login").hidden=m!=="login";$("panel").hidden=m!=="panel"};
 
+$("nPlan").onchange=()=>{
+ const custom=$("nPlan").value==="fecha";
+ $("fechaLabel").hidden=!custom;$("horaLabel").hidden=!custom;$("fechaNota").hidden=!custom;
+ if(custom&&!$("nFecha").value)$("nFecha").value=hoy();
+};
 async function entrar(){
  if(!S)return show("login");
  try{const r=await api("perfiles?select=es_admin,activo&id=eq."+S.uid);
@@ -71,15 +80,15 @@ $("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
 $("salir").onclick=()=>{S=null;keep();users=[];show("login")};
 
 async function cargar(){$("lMsg").textContent="";
- try{users=await api("perfiles?select=id,usuario,nombre,vence,permanente,activo,es_admin&order=usuario.asc");pintar()}
+ try{users=await api("perfiles?select=id,usuario,nombre,vence,vence_hora,permanente,activo,es_admin&order=usuario.asc");pintar();cargarDatos()}
  catch(e){$("lMsg").textContent="No se pudo cargar: "+e.message}}
 
 function estado(p){
  if(!p.activo)return['<span class="tag t-bad">Suspendido</span>',"Suspendido"];
  if(p.permanente||p.es_admin)return['<span class="tag t-ok">Permanente</span>',"Plan permanente"];
  const d=p.vence?dias(p.vence):-1;
- if(d<0)return['<span class="tag t-bad">Vencido</span>',"Venció el "+fmt(p.vence)];
- return[`<span class="tag ${d<=5?"t-warn":"t-ok"}">${d} días</span>`,"Vence el "+fmt(p.vence)]}
+ if(d<0)return['<span class="tag t-bad">Vencido</span>',"Venció el "+vencimiento];
+ return[`<span class="tag ${d<=5?"t-warn":"t-ok"}">${d} días</span>`,"Vence el "+vencimiento]}
 
 function pintar(){const q=$("buscar").value.trim().toLowerCase();
  const l=users.filter(p=>!q||(p.usuario||"").toLowerCase().includes(q)||(p.nombre||"").toLowerCase().includes(q));
@@ -92,9 +101,9 @@ $("buscar").oninput=pintar;
 async function patch(id,body){await api("perfiles?id=eq."+id,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(body)})}
 $("lista").onclick=async e=>{const b=e.target.closest("button[data-a]");if(!b)return;
  const p=users.find(x=>x.id===b.dataset.id);if(!p)return;let body,ask;
- if(b.dataset.a==="mas"){const base=p.vence&&p.vence>hoy()?p.vence:hoy();body={vence:sumar(base,30),activo:true};ask="¿Sumar 30 días a "+p.usuario+"? Nuevo vencimiento: "+fmt(body.vence)}
+ if(b.dataset.a==="mas"){const base=p.vence&&p.vence>hoy()?p.vence:hoy();body={vence:sumar(base,30),vence_hora:null,activo:true};ask="¿Sumar 30 días a "+p.usuario+"? Nuevo vencimiento: "+fmt(body.vence)}
  else if(b.dataset.a==="act"){body={activo:!p.activo};ask=(p.activo?"¿Suspender a ":"¿Reactivar a ")+p.usuario+"?"}
- else{body=p.permanente?{permanente:false}:{permanente:true,activo:true,vence:p.vence||hoy()};ask=(p.permanente?"¿Quitar el plan permanente a ":"¿Hacer permanente a ")+p.usuario+"?"}
+ else{body=p.permanente?{permanente:false}:{permanente:true,activo:true,vence:p.vence||hoy(),vence_hora:null};ask=(p.permanente?"¿Quitar el plan permanente a ":"¿Hacer permanente a ")+p.usuario+"?"}
  if(!confirm(ask))return;
  try{await patch(p.id,body);await cargar()}catch(err){$("lMsg").textContent="No se pudo guardar: "+err.message}};
 
@@ -102,20 +111,43 @@ $("crear").onclick=async()=>{const m=$("cMsg");m.className="msg";m.textContent="
  const u=$("nUser").value.trim().toLowerCase(),nom=$("nNombre").value.trim(),pw=$("nPass").value,plan=$("nPlan").value;
  if(!/^[a-z0-9._-]{3,30}$/.test(u)){m.className="msg err";return m.textContent="Usuario: 3 a 30 caracteres, solo letras, números, punto, guion"}
  if(pw.length<6){m.className="msg err";return m.textContent="La contraseña debe tener al menos 6 caracteres"}
- const perm=plan==="perm",vence=perm?hoy():sumar(hoy(),Number(plan));
+ const perm=plan==="perm";
+  const vence=perm?hoy():(plan==="fecha"?$("nFecha").value:sumar(hoy(),Number(plan)));
+  const venceHora=plan==="fecha"?($("nHora").value||"23:59"):null;
+  if(!perm&&plan==="fecha"&&(!vence||vence<hoy()||(vence===hoy()&&venceHora&&venceHora<=new Date().toTimeString().slice(0,5)))){m.className="msg err";return m.textContent="Elegí una fecha de hoy o posterior"}
+  const horaVencimiento=plan==="fecha"?$("nHora").value:"";
  $("crear").disabled=true;m.textContent="Creando…";
  try{
   let d;try{d=await j(await fetch(C.url+"/auth/v1/signup",{method:"POST",headers:hdr(),body:JSON.stringify({email:u+D,password:pw})}))}
   catch(e){throw new Error(/registered|already|exist/i.test(e.message)?"Ese usuario ya existe. Si quedó sin perfil, borralo en Supabase > Authentication > Users y probá de nuevo.":e.message)}
   const id=d?.user?.id||d?.id;if(!id)throw new Error("Supabase no devolvió el id del usuario");
-  await api("perfiles?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,usuario:u,nombre:nom||u,vence,permanente:perm,activo:true,es_admin:false})});
+  await api("perfiles?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,usuario:u,nombre:nom||u,vence,vence_hora:venceHora,permanente:perm,activo:true,es_admin:false})});
   m.className="msg okm";m.textContent="✓ Usuario creado";
   const txt=`Kiosco Erick\nUsuario: ${u}\nContraseña: ${pw}\n${perm?"Plan permanente":"Vence el "+fmt(vence)}`;
   $("cred").textContent=txt;$("cred").hidden=false;$("copiar").hidden=false;
   $("copiar").onclick=()=>navigator.clipboard.writeText(txt).then(()=>$("copiar").textContent="✓ Copiado");$("copiar").textContent="📋 Copiar datos";
-  ["nUser","nNombre","nPass"].forEach(i=>$(i).value="");cargar()}
+  if(plan==="fecha"){
+    $("fechaNota").hidden=false;
+    $("fechaNota").textContent="Vencimiento guardado para "+fmt(vence)+" a las "+horaVencimiento+".";
+   }
+   ["nUser","nNombre","nPass"].forEach(i=>$(i).value="");cargar()}
  catch(e){m.className="msg err";m.textContent=e.message}
  $("crear").disabled=false};
+
+
+const money=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS"}).format(n||0);
+async function cargarDatos(){
+ $("dMsg").textContent="";$("negocios").textContent="Cargando datos sincronizados…";
+ try{
+  const rows=await api("datos?select=user_id,contenido,actualizado");
+  const byId=new Map(rows.map(r=>[r.user_id,r]));
+  let ventasN=0,importeN=0,productosN=0,fiadosN=0,items=[];
+  users.forEach(p=>{const r=byId.get(p.id),d=r?.contenido||{},ventas=Array.isArray(d.sales)?d.sales:[],productos=Array.isArray(d.products)?d.products:[],fiados=d.fiado?.clients||[],importe=ventas.reduce((a,v)=>a+(Number(v.total)||0),0);ventasN+=ventas.length;importeN+=importe;productosN+=productos.length;fiadosN+=fiados.length;items.push({p,r,ventas,productos,fiados,importe})});
+  $("resumen").innerHTML=`<div class="stat">Negocios<b>${users.filter(p=>!p.es_admin).length}</b></div><div class="stat">Ventas<b>${ventasN}</b></div><div class="stat">Total vendido<b>${money(importeN)}</b></div><div class="stat">Productos<b>${productosN}</b></div><div class="stat">Clientes con fiado<b>${fiadosN}</b></div><div class="stat">Con datos en nube<b>${items.filter(x=>x.r).length}</b></div>`;
+  $("negocios").innerHTML=items.filter(x=>!x.p.es_admin).map(({p,r,ventas,productos,fiados,importe})=>`<div class="biz"><b>${esc(p.nombre||p.usuario)}</b> ${!p.activo?'<span class="tag t-bad">Pausado</span>':''}<small>@${esc(p.usuario)} · ${r?.actualizado?"Última sincronización: "+new Date(r.actualizado).toLocaleString("es-AR"):"Sin datos sincronizados"}</small><div class="stats"><div class="stat">Ventas<b>${ventas.length}</b></div><div class="stat">Facturación<b>${money(importe)}</b></div><div class="stat">Productos<b>${productos.length}</b></div><div class="stat">Fiados<b>${fiados.length}</b></div></div><details><summary>Ver movimientos y productos</summary><b>Ventas recientes</b>${ventas.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,10).map(v=>`<small>${v.date?new Date(v.date).toLocaleString("es-AR"):"Sin fecha"} · ${money(v.total)} · ${esc(v.pay||"sin medio")} · ${esc((v.items||[]).map(i=>(i.name||"Producto")+" × "+(i.qty||0)).join(", "))}</small>`).join("")||"<small>Sin ventas.</small>"}<b>Productos</b>${productos.slice(0,30).map(x=>`<small>${esc(x.name||"Sin nombre")} · Stock ${Number(x.stock)||0} · ${money(Number(x.price)||0)}</small>`).join("")||"<small>Sin productos.</small>"}<b>Movimientos de fiado</b>${fiados.flatMap(c=>(c.movs||[]).map(m=>({c,m}))).slice(-20).reverse().map(({c,m})=>`<small>${esc(c.name||"Cliente")} · ${esc(m.type||"movimiento")} · ${money(m.amount)} · ${m.date?new Date(m.date).toLocaleString("es-AR"):"Sin fecha"}</small>`).join("")||"<small>Sin movimientos.</small>"}</details></div>`).join("")||"<p>No hay negocios para mostrar.</p>";
+ }catch(e){$("negocios").textContent="";$("dMsg").textContent="No se pudieron leer los datos. Puede faltar permiso de lectura administrativa en la tabla datos (RLS). "+e.message}
+}
+$("recargarDatos").onclick=cargarDatos;
 
 entrar();
 })();
