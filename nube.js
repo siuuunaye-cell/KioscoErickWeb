@@ -12,7 +12,6 @@ async function api(p,o={}){let t=await tok();return j(await f(C.url+"/rest/v1/"+
 const ok=p=>!!p&&p.activo&&(p.es_admin||p.permanente||(!!p.vence&&p.vence>=hoy()));
 const cached=()=>{try{return JSON.parse(LS.getItem("ke_perfil")||"null")}catch{return null}};
 const ui=m=>{$("login").hidden=m!=="login";$("bloqueo").hidden=m!=="bloq"};
-function mostrarLogin(){S=null;keep();LS.removeItem("ke_perfil");$("lgMsg").textContent="Ingresá con tu usuario y contraseña. Tus datos guardados no se borraron.";ui("login");$("lgUser").focus()}
 function bloquear(t,m){$("bqT").textContent=t;$("bqM").textContent=m;$("bqSalir").hidden=false;ui("bloq")}
 const st=m=>{stMsg=m;if($("syncSt"))$("syncSt").textContent=m};
 async function arrancar(){
@@ -45,19 +44,7 @@ async function salir(){if(navigator.onLine&&LS.getItem("ke_dirty")==="1"&&S)try{
  let sin=LS.getItem("ke_dirty")==="1";if(!confirm(sin?"⚠ Hay cambios que NO se subieron a la nube y se perderían. ¿Cerrar sesión igual?":"Al cerrar sesión se borran los datos de este celular (quedan guardados en la nube). ¿Continuar?"))return;
  ["ke_products","ke_sales","ke_cash","ke_cfg","ke_fiado","ke_dirty","ke_sync_at","ke_sync_uid","ke_perfil","ke_undo","ke_session"].forEach(k=>LS.removeItem(k));location.reload()}
 window.Nube={programar,login,arrancar,sync,
- iniciar(x){h=x;$("bqSalir").onclick=salir;const cambio=$("bqLogin");if(cambio)cambio.onclick=()=>{if(confirm("¿Querés volver al inicio de sesión? Tus datos locales se conservan. Si elegís otra cuenta, revisá cuidadosamente qué datos sincronizar."))mostrarLogin()};$("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
+ iniciar(x){h=x;$("bqSalir").onclick=salir;$("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
   $("lgBtn").onclick=async()=>{let u=$("lgUser").value,p=$("lgPass").value,m=$("lgMsg");if(!u||!p)return m.textContent="Escribí usuario y contraseña";m.textContent="Entrando…";try{await login(u,p);$("lgPass").value="";m.textContent="";arrancar()}catch(e){m.textContent=e.status?"Usuario o contraseña incorrectos":"Sin conexión. Probá de nuevo con internet."}};
-  addEventListener("online",()=>sync());
-  const cargarCuenta=()=>{
-   const titulo=$("bqT"),mensaje=$("bqM");
-   titulo.textContent="Verificando cuenta…";mensaje.textContent="Esperá un momento mientras comprobamos tu acceso.";
-   let retry=$("bqRetry");if(!retry){retry=document.createElement("button");retry.id="bqRetry";retry.className="wide";retry.textContent="Reintentar";retry.onclick=()=>cargarCuenta();$("bloqueo").querySelector(".gbox").appendChild(retry)}retry.hidden=true;
-   Promise.race([arrancar(),new Promise((_,reject)=>setTimeout(()=>reject(new Error("timeout")),12000))]).catch(()=>{
-    if($("bloqueo").hidden)return;
-    titulo.textContent="No pudimos verificar la cuenta";
-    mensaje.textContent=navigator.onLine?"La conexión con el servidor tardó demasiado. Probá otra vez.":"No hay conexión a internet. Conectate y reintentá.";
-    retry.hidden=false;
-   });
-  };
-  addEventListener("online",()=>{if(!$("bloqueo").hidden)cargarCuenta();else sync()});cargarCuenta()}};
+  addEventListener("online",()=>sync());arrancar()}};
 })();

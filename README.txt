@@ -18,6 +18,3 @@ Caja y ganancia: en Venta se elige el medio de pago (efectivo, transferencia, Me
 Stock bajo y aumento masivo: aviso de stock bajo con lista para el proveedor; en Productos > Actualizar precios se sube o baja un % con redondeo y botón para deshacer.
 
 Fiado: en Venta se elige Fiado y el nombre del cliente; la compra se suma a su cuenta (no entra a la caja). En la pestaña Fiados se ve cuánto debe cada uno, se registran pagos (que sí entran a la caja del día) y se manda la cuenta completa por WhatsApp.
-
-
-Actualización v10: historial detallado por producto (fecha y hora, precio unitario, cantidad y subtotal); datos de titular, alias, CVU/CBU y entidad para transferencias; lista de fiados más resistente a datos antiguos; mejoras de cámara con resolución ideal alta, intento de enfoque continuo y control de linterna si el teléfono lo permite. La compatibilidad del enfoque/linterna depende del dispositivo y navegador.
