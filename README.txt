@@ -20,3 +20,5 @@ Stock bajo y aumento masivo: aviso de stock bajo con lista para el proveedor; en
 Fiado: en Venta se elige Fiado y el nombre del cliente; la compra se suma a su cuenta (no entra a la caja). En la pestaña Fiados se ve cuánto debe cada uno, se registran pagos (que sí entran a la caja del día) y se manda la cuenta completa por WhatsApp.
 
 Pan y fiambres: en Productos, 'Se vende por' Unidad o Kilo. Los productos por kilo piden gramos o pesos al agregarlos (ej: 250 g o $2.000), el precio es por kilo y el stock se lleva en kilos.
+
+Nombre automático: al escanear un código nuevo en Productos (o con el botón 'Buscar el nombre con el código') la app busca el nombre en bases abiertas de internet (Open Food Facts y similares). Hay que revisarlo y completar precio y stock. Si no lo encuentra, se escribe a mano.
