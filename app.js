@@ -33,16 +33,42 @@ $("aplicarAum").onclick=()=>{let pct=Number($("aumPct").value),st=Number($("aumR
 $("deshacerAum").onclick=()=>{let u;try{u=JSON.parse(localStorage.getItem("ke_undo")||"[]")}catch{u=[]}if(!u.length||!confirm("¿Volver a los precios anteriores al último aumento?"))return;u.forEach(x=>{let p=products.find(y=>y.id===x.id);if(p){p.price=x.price;p.cost=x.cost}});localStorage.removeItem("ke_undo");save();render();toast("Precios restaurados")};
 render();
 async function buscarNombre(code){
+ code=String(code||"").trim().replace(/\s+/g,"");
  if(!code)return toast("Escribí o escaneá el código primero");
  if(!navigator.onLine){$("prodNombre").focus();return toast("Sin internet: escribí el nombre a mano")}
- toast("Buscando el nombre…");
- for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org","world.openproductsfacts.org"]){
-  let ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),6000);
-  try{let r=await fetch("https://"+host+"/api/v2/product/"+encodeURIComponent(code)+".json?fields=product_name,product_name_es,brands,quantity",{signal:ctl.signal}),d=await r.json(),p=d&&d.status===1?d.product:null,n=p?String(p.product_name_es||p.product_name||"").trim():"";
-   if(n){let b=String(p.brands||"").split(",")[0].trim(),q=String(p.quantity||"").trim();if(b&&!n.toLowerCase().includes(b.toLowerCase()))n=b+" "+n;if(q&&!n.toLowerCase().includes(q.toLowerCase()))n+=" "+q;
-    if(!$("prodNombre").value.trim())$("prodNombre").value=n;toast("Encontré: "+n+". Revisalo y poné el precio");$("prodPrecio").focus();return}
-  }catch{}finally{clearTimeout(t)}}
- $("prodNombre").focus();toast("No encontré ese código en internet. Escribí el nombre")}
+ // No pisar un nombre que el usuario ya escribió; si está vacío, completar desde la mejor fuente.
+ toast("Buscando el código en varias bases de datos…");
+ const normaliza=v=>String(v||"").trim();
+ const aplicar=(nombre,marca="",cantidad="")=>{
+  let n=normaliza(nombre),b=normaliza(marca).split(/[,;]/)[0].trim(),q=normaliza(cantidad);
+  if(!n)return false;
+  if(b&&!n.toLowerCase().includes(b.toLowerCase()))n=b+" "+n;
+  if(q&&!n.toLowerCase().includes(q.toLowerCase()))n+=" "+q;
+  if(!$("prodNombre").value.trim())$("prodNombre").value=n;
+  toast("Encontré: "+n+". Revisalo y completá precio y stock");$("prodPrecio").focus();return true;
+ };
+ const limpio=code.replace(/\D/g,"");
+ const codigos=[...new Set([code, ...(limpio.length===12?["0"+limpio]:[]), ...(limpio.length===13&&limpio.startsWith("0")?[limpio.slice(1)]:[])])];
+ const campos="product_name,product_name_es,brands,quantity";
+ const tareas=[];
+ // Bases abiertas por categoría: cada producto puede estar en una sola de ellas.
+ for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org","world.openproductsfacts.org","world.openpetfoodfacts.org"]){
+  for(const c of codigos)tareas.push((async()=>{
+   const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),6500);
+   try{const r=await fetch("https://"+host+"/api/v2/product/"+encodeURIComponent(c)+".json?fields="+campos,{signal:ctl.signal,cache:"no-store"});if(!r.ok)return null;const d=await r.json(),p=d&&d.status===1?d.product:null;return p?{name:p.product_name_es||p.product_name,brand:p.brands,quantity:p.quantity,source:host}:null}catch{return null}finally{clearTimeout(tm)}
+  })());
+ }
+ // Dos servicios de consulta general. Pueden tener límites de uso; no son infalibles.
+ for(const c of codigos){
+  tareas.push((async()=>{const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),6500);try{const r=await fetch("https://api.upcitemdb.com/prod/trial/lookup?upc="+encodeURIComponent(c),{signal:ctl.signal,cache:"no-store",headers:{Accept:"application/json"}});if(!r.ok)return null;const d=await r.json(),i=Array.isArray(d.items)?d.items[0]:null;return i?{name:i.title,brand:i.brand,quantity:i.size,source:"UPCitemdb"}:null}catch{return null}finally{clearTimeout(tm)}})());
+  tareas.push((async()=>{const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),6500);try{const r=await fetch("https://api.barcodefinder.info/barcode/"+encodeURIComponent(c),{signal:ctl.signal,cache:"no-store",headers:{Accept:"application/json"}});if(!r.ok)return null;const d=await r.json(),i=d.product||d.item||d;return (i.title||i.name)?{name:i.title||i.name,brand:i.brand,quantity:i.quantity||i.size,source:"BarcodeFinder"}:null}catch{return null}finally{clearTimeout(tm)}})());
+ }
+ const respuestas=await Promise.allSettled(tareas);
+ // Preferir el primer resultado que realmente tenga nombre.
+ for(const r of respuestas){if(r.status==="fulfilled"&&r.value&&normaliza(r.value.name)){if(aplicar(r.value.name,r.value.brand,r.value.quantity))return}}
+ $("prodNombre").focus();
+ toast("No encontré ese código. Probá de nuevo o escribí el nombre manualmente");
+}
 function updFiado(){let raw=($("fiadoNombre").value||"").trim(),n=raw.toLowerCase(),c=fiado.clients.find(x=>x.name.toLowerCase()===n),t=cartTotal(),L=fiado.clients.filter(x=>!n||x.name.toLowerCase().includes(n)).sort((a,b)=>a.name.localeCompare(b.name));
  $("fiadoChips").innerHTML=L.map(x=>`<button type="button" class="chip${c&&c.id===x.id?" on":""}" data-n="${esc(x.name)}">${esc(x.name)}${bal(x)>0?" · "+money(bal(x)):""}</button>`).join("");
  if(n&&!c)$("fiadoChips").innerHTML+=`<button type="button" class="chip add" id="fiadoAdd">➕ Agregar "${esc(raw)}"</button>`;$("fiadoChips").querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{$("fiadoNombre").value=b.dataset.n;updFiado()});if(n&&!c)$("fiadoAdd").onclick=()=>{getCl(raw);save();updFiado();renderFiados()};
