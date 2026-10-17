@@ -66,8 +66,31 @@ async function buscarNombre(code){
  const respuestas=await Promise.allSettled(tareas);
  // Preferir el primer resultado que realmente tenga nombre.
  for(const r of respuestas){if(r.status==="fulfilled"&&r.value&&normaliza(r.value.name)){if(aplicar(r.value.name,r.value.brand,r.value.quantity))return}}
- $("prodNombre").focus();
- toast("No encontré ese código. Probá de nuevo o escribí el nombre manualmente");
+ // Si el código no está registrado, permitir buscar por nombre en los catálogos abiertos.
+ const termino=window.prompt("No encontré ese código. Escribí el nombre del producto para buscarlo (por ejemplo: azúcar):");
+ if(!termino||!termino.trim()){ $("prodNombre").focus(); toast("Podés escribir el nombre del producto manualmente"); return; }
+ toast("Buscando productos por nombre…");
+ const hosts=["world.openfoodfacts.org","world.openproductsfacts.org","world.openbeautyfacts.org","world.openpetfoodfacts.org"];
+ const buscarPorNombre=async host=>{
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),7000);
+  try{
+   const u="https://"+host+"/cgi/search.pl?"+new URLSearchParams({search_terms:termino.trim(),search_simple:"1",action:"process",json:"1",page_size:"8",fields:"product_name,product_name_es,brands,quantity,code"});
+   const r=await fetch(u,{signal:ctl.signal,cache:"no-store",headers:{Accept:"application/json"}});if(!r.ok)return [];
+   const d=await r.json();return (Array.isArray(d.products)?d.products:[]).map(p=>({name:p.product_name_es||p.product_name,brand:p.brands,quantity:p.quantity,code:p.code,source:host})).filter(p=>normaliza(p.name));
+  }catch{return []}finally{clearTimeout(tm)}
+ };
+ const hallazgos=(await Promise.allSettled(hosts.map(buscarPorNombre))).flatMap(r=>r.status==="fulfilled"?r.value:[]);
+ const unicos=[];const vistos=new Set();for(const p of hallazgos){const k=(p.name+"|"+(p.brand||"")).toLowerCase();if(!vistos.has(k)){vistos.add(k);unicos.push(p)}}
+ if(unicos.length){
+  const opciones=unicos.slice(0,12).map((p,i)=>(i+1)+". "+p.name+(p.brand?" — "+p.brand:"")+(p.quantity?" ("+p.quantity+")":"")).join("\n");
+  const eleccion=window.prompt("Elegí el producto correcto escribiendo su número. Revisá bien la marca y el tamaño:\n\n"+opciones+"\n\n0. Ninguno de estos");
+  const n=Number(eleccion);
+  if(Number.isInteger(n)&&n>=1&&n<=Math.min(12,unicos.length)){const p=unicos[n-1];if(p.code&&!$("prodCodigo").value.trim())$("prodCodigo").value=p.code;aplicar(p.name,p.brand,p.quantity);return;}
+ }
+ // No inventar un nombre ni un código: dejar que la persona lo escriba.
+ const manual=window.prompt("No encontré coincidencias confiables. Escribí el nombre del producto:",termino.trim());
+ if(manual&&manual.trim()){$("prodNombre").value=manual.trim();$("prodPrecio").focus();toast("Nombre cargado. Revisá el código, el precio y el stock");return}
+ $("prodNombre").focus();toast("No encontré ese producto. Podés cargarlo manualmente");
 }
 function updFiado(){let raw=($("fiadoNombre").value||"").trim(),n=raw.toLowerCase(),c=fiado.clients.find(x=>x.name.toLowerCase()===n),t=cartTotal(),L=fiado.clients.filter(x=>!n||x.name.toLowerCase().includes(n)).sort((a,b)=>a.name.localeCompare(b.name));
  $("fiadoChips").innerHTML=L.map(x=>`<button type="button" class="chip${c&&c.id===x.id?" on":""}" data-n="${esc(x.name)}">${esc(x.name)}${bal(x)>0?" · "+money(bal(x)):""}</button>`).join("");
@@ -84,4 +107,4 @@ function renderFiados(){let v=$("fiadoVista"),q=($("buscarCliente").value||"").t
  $("fBorrar").onclick=()=>{let b=bal(c);if(!confirm("¿Eliminar a "+c.name+" de la lista de fiados?"+(b>0?"\n\n⚠ Todavía debe "+money(b)+". Esa deuda se pierde.":"")+"\n\nSe borra también su historial."))return;fiado.clients=fiado.clients.filter(x=>x.id!==c.id);fiadoSel=null;save();render();toast(c.name+" eliminado")};$("fPago").onclick=()=>{$("pagoForm").hidden=!$("pagoForm").hidden};
  $("pagoOk").onclick=()=>{let a=nv("pagoMonto");if(!(a>0))return toast("Escribí cuánto pagó");let mv={id:String(Date.now()),date:new Date().toISOString(),type:"pago",amount:a,method:$("pagoMedio").value};c.movs.push(mv);fiado.cobros.push({id:mv.id,date:mv.date,amount:a,method:mv.method,client:c.name});save();render();toast("Pago registrado: "+money(a)+" · "+(bal(c)>0?"Debe "+money(bal(c)):"Sin deuda"))};
  $("fEnviar").onclick=async()=>{let t=buildCuenta(c);try{if(navigator.share){await navigator.share({text:t});return}}catch(e){if(e.name==="AbortError")return}window.open("https://wa.me/?text="+encodeURIComponent(t),"_blank")}}
-$("kgGramos").oninput=()=>kgCalc("g");$("kgPesos").oninput=()=>kgCalc("p");$("kgNo").onclick=()=>{$("kgModal").hidden=true};$("kgOk").onclick=kgOk;$("btnNombre").onclick=()=>buscarNombre($("prodCodigo").value.trim());window.keReady=true;$("ver").textContent="v20";Nube.iniciar({get:()=>({products,sales,cash,cfg,fiado}),aplicar:d=>{products=Array.isArray(d.products)?d.products:[];sales=Array.isArray(d.sales)?d.sales:[];cash=d.cash&&typeof d.cash==="object"?d.cash:{};cfg=d.cfg&&typeof d.cfg==="object"?d.cfg:{min:5};fiado=nf(d.fiado);localStorage.setItem("ke_fiado",JSON.stringify(fiado));cart=[];localStorage.setItem("ke_products",JSON.stringify(products));localStorage.setItem("ke_sales",JSON.stringify(sales));localStorage.setItem("ke_cash",JSON.stringify(cash));localStorage.setItem("ke_cfg",JSON.stringify(cfg));render()},toast});
+$("kgGramos").oninput=()=>kgCalc("g");$("kgPesos").oninput=()=>kgCalc("p");$("kgNo").onclick=()=>{$("kgModal").hidden=true};$("kgOk").onclick=kgOk;$("btnNombre").onclick=()=>buscarNombre($("prodCodigo").value.trim());window.keReady=true;$("ver").textContent="v21";Nube.iniciar({get:()=>({products,sales,cash,cfg,fiado}),aplicar:d=>{products=Array.isArray(d.products)?d.products:[];sales=Array.isArray(d.sales)?d.sales:[];cash=d.cash&&typeof d.cash==="object"?d.cash:{};cfg=d.cfg&&typeof d.cfg==="object"?d.cfg:{min:5};fiado=nf(d.fiado);localStorage.setItem("ke_fiado",JSON.stringify(fiado));cart=[];localStorage.setItem("ke_products",JSON.stringify(products));localStorage.setItem("ke_sales",JSON.stringify(sales));localStorage.setItem("ke_cash",JSON.stringify(cash));localStorage.setItem("ke_cfg",JSON.stringify(cfg));render()},toast});
