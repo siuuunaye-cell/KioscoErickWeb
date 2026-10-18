@@ -22,3 +22,5 @@ Fiado: en Venta se elige Fiado y el nombre del cliente; la compra se suma a su c
 Pan y fiambres: en Productos, 'Se vende por' Unidad o Kilo. Los productos por kilo piden gramos o pesos al agregarlos (ej: 250 g o $2.000), el precio es por kilo y el stock se lleva en kilos.
 
 Nombre automático: al escanear un código nuevo en Productos (o con el botón 'Buscar el nombre con el código') la app busca el nombre en bases abiertas de internet (Open Food Facts y similares). Hay que revisarlo y completar precio y stock. Si no lo encuentra, se escribe a mano.
+
+Cobro con QR de Mercado Pago: en Copias > Configurar Mercado Pago se conecta la cuenta del kiosco. Al elegir Mercado Pago y cobrar, se muestra un QR por el monto; cuando el cliente paga aparece APROBADO, suena un aviso y la venta se registra sola. Requiere la función mp-qr y las tablas mp_cuentas y cobros_qr en Supabase.

@@ -2,12 +2,13 @@
 let S=null,h={},ver=0,tm=null,busy=false,stMsg="";try{S=JSON.parse(LS.getItem("ke_session")||"null")}catch{}
 const hoy=()=>{let x=new Date();return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
 const hdr=t=>({apikey:C.key,"Content-Type":"application/json",...(t?{Authorization:"Bearer "+t}:{})});
-const f=(u,o)=>{let c=new AbortController(),t=setTimeout(()=>c.abort(),8000);return fetch(u,{...o,signal:c.signal}).finally(()=>clearTimeout(t))};
-async function j(r){let d=null;try{d=await r.json()}catch{}if(!r.ok)throw Object.assign(new Error(d?.msg||d?.error_description||d?.message||"Error "+r.status),{status:r.status});return d}
+const f=(u,o,ms)=>{let c=new AbortController(),t=setTimeout(()=>c.abort(),ms||8000);return fetch(u,{...o,signal:c.signal}).finally(()=>clearTimeout(t))};
+async function j(r){let d=null;try{d=await r.json()}catch{}if(!r.ok)throw Object.assign(new Error(d?.msg||d?.error_description||d?.message||d?.error||"Error "+r.status),{status:r.status});return d}
 const keep=()=>S?LS.setItem("ke_session",JSON.stringify(S)):LS.removeItem("ke_session");
 function setTok(d,u){S={access:d.access_token,refresh:d.refresh_token,exp:Date.now()+(d.expires_in-60)*1000,uid:d.user.id,usuario:u||S.usuario};keep()}
 async function login(u,p){u=u.trim().toLowerCase();setTok(await j(await f(C.url+"/auth/v1/token?grant_type=password",{method:"POST",headers:hdr(),body:JSON.stringify({email:u.includes("@")?u:u+D,password:p})})),u)}
 async function tok(){if(!S)throw Object.assign(new Error("Sin sesión"),{status:401});if(Date.now()<S.exp)return S.access;setTok(await j(await f(C.url+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:hdr(),body:JSON.stringify({refresh_token:S.refresh})})));return S.access}
+async function mp(b){let t=await tok();return j(await f(C.url+"/functions/v1/"+(C.mpFn||"mp-qr"),{method:"POST",headers:hdr(t),body:JSON.stringify(b)},25000))}
 async function api(p,o={}){let t=await tok();return j(await f(C.url+"/rest/v1/"+p,{...o,headers:{...hdr(t),...(o.headers||{})}}))}
 const ok=p=>!!p&&p.activo&&(p.es_admin||p.permanente||(!!p.vence&&p.vence>=hoy()));
 const cached=()=>{try{return JSON.parse(LS.getItem("ke_perfil")||"null")}catch{return null}};
@@ -22,7 +23,7 @@ async function arrancar(){
  catch(e){if([400,401,403].includes(e.status)){S=null;keep();ui("login");return}p=cached()}
  if(!p)return bloquear("No se pudo verificar tu cuenta","Conectate a internet para verificarla.");
  if(!ok(p))return bloquear(p.activo?"Tu plan venció":"Cuenta suspendida","Contactá a Kiosco Erick para renovar. Tus datos siguen guardados.");
- ui("app");cuenta(p);sync()}
+ ui("app");cuenta(p);sync();if(h.ready)h.ready()}
 function cuenta(p){let perm=p.permanente||p.es_admin,dias=perm?null:Math.ceil((new Date(p.vence+"T00:00:00")-new Date(hoy()+"T00:00:00"))/864e5);
  $("cuentaBox").innerHTML=`<div class="item"><div class="info"><b>👤 ${esc(p.usuario)}</b><small>${perm?"Plan permanente":"Vence el "+p.vence.split("-").reverse().join("/")+" ("+dias+" días)"}</small><small id="syncSt">${esc(stMsg)}</small></div></div><button id="btnSync" class="wide">🔄 Sincronizar ahora</button><button id="btnSalir" class="wide">Cerrar sesión</button>`;
  $("btnSync").onclick=()=>sync(true);$("btnSalir").onclick=salir;if(!perm&&dias<=5&&h.toast)h.toast("Tu plan vence en "+dias+" días")}
@@ -42,8 +43,8 @@ async function sync(manual){if(busy||!S||!navigator.onLine||!h.get)return;busy=t
 function programar(){ver++;LS.setItem("ke_dirty","1");clearTimeout(tm);if(S)tm=setTimeout(sync,3000)}
 async function salir(){if(navigator.onLine&&LS.getItem("ke_dirty")==="1"&&S)try{await subir()}catch{}
  let sin=LS.getItem("ke_dirty")==="1";if(!confirm(sin?"⚠ Hay cambios que NO se subieron a la nube y se perderían. ¿Cerrar sesión igual?":"Al cerrar sesión se borran los datos de este celular (quedan guardados en la nube). ¿Continuar?"))return;
- ["ke_products","ke_sales","ke_cash","ke_cfg","ke_fiado","ke_dirty","ke_sync_at","ke_sync_uid","ke_perfil","ke_undo","ke_session"].forEach(k=>LS.removeItem(k));location.reload()}
-window.Nube={programar,login,arrancar,sync,
+ ["ke_products","ke_sales","ke_cash","ke_cfg","ke_fiado","ke_mp","ke_dirty","ke_sync_at","ke_sync_uid","ke_perfil","ke_undo","ke_session"].forEach(k=>LS.removeItem(k));location.reload()}
+window.Nube={programar,login,arrancar,sync,mp,
  iniciar(x){h=x;$("bqSalir").onclick=salir;$("lgPass").onkeydown=e=>{if(e.key==="Enter")$("lgBtn").click()};
   $("lgBtn").onclick=async()=>{let u=$("lgUser").value,p=$("lgPass").value,m=$("lgMsg");if(!u||!p)return m.textContent="Escribí usuario y contraseña";m.textContent="Entrando…";try{await login(u,p);$("lgPass").value="";m.textContent="";arrancar()}catch(e){m.textContent=e.status?"Usuario o contraseña incorrectos":"Sin conexión. Probá de nuevo con internet."}};
   addEventListener("online",()=>sync());arrancar()}};
